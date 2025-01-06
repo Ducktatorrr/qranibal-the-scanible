@@ -1,6 +1,10 @@
 # QRanibal the Scanibal
 
-This is a simple Flask web app I wrote to scan QR codes and extract DEV EUIs using the device's camera.
+This is a simple Flask web app I wrote to scan QR codes and extract DEV EUIs using the device's camera. It serves a basic HTML page, accesses the camera via `getUserMedia`, and repeatedly sends the captured frames to the Flask `/process_frame` endpoint for server-side decoding.
+
+Please note that this is a very basic proof-of-concept application. In a real-world scenario, you would likely want to handle decoding on the client side.
+
+**Therefore, disclaimer:** Use at your own risk—this code is not production-ready.
 
 ## Usage
 
