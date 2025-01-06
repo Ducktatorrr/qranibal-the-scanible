@@ -4,6 +4,12 @@ This is a simple Flask web app I wrote to scan QR codes and extract DEV EUIs usi
 
 ## Usage
 
+Before all else, let's clone the repo:
+
+```bash
+git clone https://github.com/Ducktatorrr/qranibal-the-scanible.git
+```
+
 There are two ways to run this app:
 
 ### Docker
