@@ -30,7 +30,7 @@ docker run -p 5000:5000 qranibal
 
 #### 0. Prerequisites:
 
-You will need zbar installed on your system.
+Besides Python3, you will also need zbar installed on your system.
 
 On **Linux**:
 
