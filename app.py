@@ -10,8 +10,7 @@ app = Flask(__name__)
 # Initialize QR code reader
 qreader = QReader()
 
-# Store detected codes and messages
-codes = set()
+
 deveui_size = 16
 invalid_message = ""
 message_end_time = 0
