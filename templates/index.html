@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<script src="https://cdn.tailwindcss.com"></script>
+		<title>QRanibal the Scanibal</title>
+		<style type="text/tailwindcss">
+			@layer utilities {
+				.button-primary {
+					@apply bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded;
+				}
+				.button-primary-outline {
+					@apply border border-blue-500 hover:bg-blue-500 hover:text-white text-blue-500 font-bold py-2 px-4 rounded;
+				}
+				.button-danger {
+					@apply bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded;
+				}
+				.button-danger-outline {
+					@apply border border-red-500 hover:bg-red-500 text-red-500 font-bold py-2 px-4 rounded;
+				}
+
+				.text-success {
+					@apply text-green-500;
+				}
+				.text-warning {
+					@apply text-orange-500;
+				}
+				.text-danger {
+					@apply text-red-500;
+				}
+			}
+		</style>
+		<style>
+			body {
+				font-family: Arial, sans-serif;
+			}
+
+			#scanning-message,
+			#warning-message,
+			#error-message {
+				z-index: 99;
+				position: absolute;
+				bottom: 0;
+				display: none;
+				margin-bottom: 1rem;
+			}
+
+			button {
+				margin: 5px;
+			}
+
+			#codes-list {
+				list-style: none;
+				padding: 0;
+			}
+
+			@keyframes pulse {
+				0% {
+					opacity: 0.4;
+				}
+				50% {
+					opacity: 0.7;
+				}
+				100% {
+					opacity: 0;
+				}
+			}
+
+			#success-overlay {
+				z-index: 98;
+				animation: none;
+				opacity: 0;
+			}
+		</style>
+	</head>
+	<body class="bg-slate-900">
+		<div
+			class="flex flex-col justify-center items-center xl:container mx-auto xl:justify-none xl:items-start"
+		>
+			<h1 class="text-3xl my-6 text-white">QRanibal the Scanibal 🦆</h1>
+			<div class="grid xl:grid-cols-2 grid-cols-1 gap-4">
+				<div class="flex flex-col justify-center mb-6">
+					<div
+						id="video-container"
+						class="relative flex flex-col items-center justify-center w-[640px] h-[480px] mb-6"
+					>
+						<div
+							id="success-overlay"
+							class="absolute top-0 left-0 w-full h-full bg-green-500 opacity-0 pointer-events-none"
+						></div>
+
+						<div class="flex justify-center">
+							<h3
+								id="scanning-message"
+								class="text-success bg-white p-2 rounded-md"
+							></h3>
+							<h3
+								id="warning-message"
+								class="text-warning bg-white p-2 rounded-md"
+							></h3>
+							<h3
+								id="error-message"
+								class="text-danger bg-white p-2 rounded-md"
+							></h3>
+						</div>
+						<video
+							id="video"
+							autoplay
+							playsinline
+							width="640"
+							height="480"
+						></video>
+						<canvas
+							id="overlay-canvas"
+							width="640"
+							height="480"
+							class="absolute top-0 left-0"
+						></canvas>
+					</div>
+					<div>
+						<button id="start-scan" class="button-primary">
+							Start Scanning
+						</button>
+						<button id="stop-scan" class="button-primary-outline">
+							Stop Scanning
+						</button>
+					</div>
+				</div>
+				<div class="flex flex-col">
+					<h2 class="text-2xl mb-4 text-white">Detected Codes</h2>
+					<div class="overflow-x-auto">
+						<div class="relative overflow-x-auto shadow-md sm:rounded-lg">
+							<table
+								class="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400"
+							>
+								<thead
+									class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400"
+								>
+									<tr>
+										<th scope="col" class="px-6 py-3">#</th>
+										<th scope="col" class="px-6 py-3">DEV EUI</th>
+									</tr>
+								</thead>
+								<tbody id="codes-list">
+									<!-- we insert table data here -->
+								</tbody>
+							</table>
+						</div>
+					</div>
+					<div class="mt-4">
+						<button id="onboard" class="button-primary">Onboard</button>
+						<button id="download" class="button-primary-outline">
+							Download CSV
+						</button>
+						<button id="clear-codes" class="button-danger float-right">
+							Clear Codes
+						</button>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<script>
+			const video = document.getElementById("video");
+			const overlayCanvas = document.getElementById("overlay-canvas");
+			const startScanButton = document.getElementById("start-scan");
+			const stopScanButton = document.getElementById("stop-scan");
+			const clearButton = document.getElementById("clear-codes");
+			const downloadButton = document.getElementById("download");
+			const codesList = document.getElementById("codes-list");
+			const scanningMessage = document.getElementById("scanning-message");
+			const errorMessage = document.getElementById("error-message");
+			const warningMessage = document.getElementById("warning-message");
+
+			let scanning = false;
+			let detectedCodes = new Set();
+			const context = overlayCanvas.getContext("2d");
+
+			function showPulseOverlay() {
+				const overlay = document.getElementById("success-overlay");
+				overlay.style.animation = "none";
+				overlay.style.opacity = "0.4";
+				overlay.offsetHeight;
+				overlay.style.animation = "pulse 0.4s ease-out";
+				overlay.addEventListener(
+					"animationend",
+					() => {
+						overlay.style.opacity = "0";
+					},
+					{ once: true }
+				);
+			}
+
+			function drawRectangle() {
+				context.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+				context.strokeStyle = "green";
+				context.lineWidth = 2;
+				context.strokeRect(
+					overlayCanvas.width / 4,
+					overlayCanvas.height / 4,
+					overlayCanvas.width / 2,
+					overlayCanvas.height / 2
+				);
+			}
+
+			async function startCamera() {
+				const stream = await navigator.mediaDevices.getUserMedia({
+					video: true,
+				});
+				video.srcObject = stream;
+
+				const drawLoop = () => {
+					if (scanning) {
+						drawRectangle();
+						requestAnimationFrame(drawLoop);
+					} else {
+						context.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+					}
+				};
+				drawLoop();
+			}
+
+			function stopCamera() {
+				const stream = video.srcObject;
+				if (stream) {
+					stream.getTracks().forEach((track) => track.stop());
+					video.srcObject = null;
+				}
+			}
+
+			function showMessage(element, message, clearOtherMessages = true) {
+				if (clearOtherMessages) {
+					[scanningMessage, warningMessage, errorMessage].forEach((msg) => {
+						if (msg !== element) msg.style.display = "none";
+					});
+				}
+
+				if (message) {
+					element.textContent = message;
+					element.style.display = "block";
+
+					clearTimeout(element.hideTimeout);
+					element.hideTimeout = setTimeout(() => {
+						element.style.display = "none";
+					}, 2000);
+				} else {
+					element.style.display = "none";
+				}
+			}
+
+			async function captureFrame() {
+				if (!scanning) return;
+
+				const canvas = document.createElement("canvas");
+				canvas.width = video.videoWidth;
+				canvas.height = video.videoHeight;
+				const ctx = canvas.getContext("2d");
+				ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+				try {
+					const response = await fetch("/process_frame", {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({ frame: canvas.toDataURL("image/png") }),
+					});
+					const data = await response.json();
+
+					if (data.error) showMessage(errorMessage, data.error);
+					if (data.warning) showMessage(warningMessage, data.warning);
+
+					if (data.code) {
+						if (!detectedCodes.has(data.code)) {
+							detectedCodes.add(data.code);
+							codesList.innerHTML = Array.from(detectedCodes)
+								.map(
+									(code, index) => `
+                <tr class="odd:bg-white odd:dark:bg-gray-900 even:bg-gray-50 even:dark:bg-gray-800 border-b dark:border-gray-700">
+                    <td class="px-6 py-4">${index + 1}</td>
+                    <td class="px-6 py-4">${code}</td>
+                </tr>`
+								)
+								.join("");
+							showMessage(scanningMessage, `Detected new code: ${data.code}`);
+							showPulseOverlay();
+						} else {
+							showMessage(scanningMessage, "Code already added!");
+						}
+					}
+				} catch (err) {
+					showMessage(
+						errorMessage,
+						"An error occurred while processing the frame."
+					);
+					console.error(err);
+				}
+
+				if (scanning) {
+					setTimeout(captureFrame, 500);
+				}
+			}
+
+			startScanButton.addEventListener("click", () => {
+				scanning = true;
+				startCamera();
+				captureFrame();
+			});
+
+			stopScanButton.addEventListener("click", () => {
+				scanning = false;
+				stopCamera();
+			});
+
+			downloadButton.addEventListener("click", () => {
+				const csvContent = ["dev_eui"]
+					.concat(
+						Array.from(detectedCodes).map((code) => code.replace(/,/g, ";"))
+					)
+					.join("\n");
+				const csvBlob = new Blob([csvContent], { type: "text/csv" });
+				const csvUrl = URL.createObjectURL(csvBlob);
+				const link = document.createElement("a");
+				link.href = csvUrl;
+				link.download = "codes.csv";
+				link.click();
+			});
+
+			clearButton.addEventListener("click", () => {
+				detectedCodes.clear();
+				codesList.innerHTML = "";
+				showMessage(scanningMessage, "Codes cleared!");
+			});
+		</script>
+	</body>
+</html>
